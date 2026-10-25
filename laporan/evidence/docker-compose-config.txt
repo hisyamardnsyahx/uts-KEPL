@@ -1,0 +1,93 @@
+name: uas-inventaris-lab
+services:
+  backend:
+    build:
+      context: /home/hatch/workspace/uas-inventaris-lab/backend
+      dockerfile: Dockerfile
+    container_name: uas_lab_backend
+    depends_on:
+      db:
+        condition: service_healthy
+        required: true
+    environment:
+      APP_DEBUG: "false"
+      APP_ENV: production
+      APP_KEY: ""
+      APP_NAME: Inventaris Lab
+      APP_URL: http://localhost:8000
+      CACHE_STORE: file
+      DB_CONNECTION: mysql
+      DB_DATABASE: inventaris_lab
+      DB_HOST: db
+      DB_PASSWORD: ***TERSAMAR***
+      DB_PORT: "3306"
+      DB_USERNAME: lab_user
+      QUEUE_CONNECTION: sync
+      SESSION_DRIVER: array
+    networks:
+      lab_net: null
+    ports:
+      - mode: ingress
+        target: 80
+        published: "8000"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: volume
+        source: backend_storage
+        target: /app/storage
+        volume: {}
+  db:
+    container_name: uas_lab_db
+    environment:
+      MYSQL_DATABASE: inventaris_lab
+      MYSQL_PASSWORD: ***TERSAMAR***
+      MYSQL_ROOT_PASSWORD: ***TERSAMAR***
+      MYSQL_USER: lab_user
+    healthcheck:
+      test:
+        - CMD
+        - mysqladmin
+        - ping
+        - -h
+        - localhost
+        - -u
+        - root
+        - -p***
+      timeout: 5s
+      interval: 5s
+      retries: 20
+    image: mysql:8.0.46
+    networks:
+      lab_net: null
+    restart: unless-stopped
+    volumes:
+      - type: volume
+        source: db_data
+        target: /var/lib/mysql
+        volume: {}
+  frontend:
+    build:
+      context: /home/hatch/workspace/uas-inventaris-lab/frontend
+      dockerfile: Dockerfile
+    container_name: uas_lab_frontend
+    depends_on:
+      backend:
+        condition: service_started
+        required: true
+    networks:
+      lab_net: null
+    ports:
+      - mode: ingress
+        target: 80
+        published: "8080"
+        protocol: tcp
+    restart: unless-stopped
+networks:
+  lab_net:
+    name: uas_lab_net
+volumes:
+  backend_storage:
+    name: uas_lab_backend_storage
+  db_data:
+    name: uas_lab_db_data

@@ -1,0 +1,10 @@
+HTTP/1.1 401 Unauthorized
+Access-Control-Allow-Origin: *
+Cache-Control: no-cache, private
+Content-Type: application/json
+Date: Sun, 25 Oct 2026 11:41:20 GMT
+Server: FrankenPHP Caddy
+X-Powered-By: PHP/8.4.27
+X-Served-By: FrankenPHP
+Content-Length: 30
+

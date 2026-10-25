@@ -1,0 +1,16 @@
+# Caddyfile untuk FrankenPHP. Satu-satunya server aplikasi backend.
+{
+    frankenphp
+    order php_server before file_server
+    log
+}
+
+:80 {
+    root * public/
+    encode zstd br gzip
+
+    # Header ini + log container adalah bukti bahwa API dilayani FrankenPHP.
+    header X-Served-By "FrankenPHP"
+
+    php_server
+}

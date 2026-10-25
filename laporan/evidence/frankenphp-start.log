@@ -1,0 +1,2 @@
+{"level":"info","ts":1792928087.0122838,"logger":"frankenphp","msg":"FrankenPHP started 🐘","php_version":"8.4.27","total_threads":4,"worker_threads":0,"max_threads":4,"max_requests":0}
+{"level":"info","ts":1792928087.0168755,"logger":"http.log","msg":"server running","name":"srv0","protocols":["h1","h2","h3"]}
