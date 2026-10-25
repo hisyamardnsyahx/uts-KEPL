@@ -1,68 +1,144 @@
-# Inventaris Lab — Backend Laravel + Frontend Vue + Docker Compose
+# Inventaris Lab
 
-Tema bebas (bukan tema tugas sebelumnya): **pencatatan alat praktikum laboratorium**.
-Satu resource dengan CRUD lengkap: **equipments** (alat) — nama, kode unik,
-kategori, jumlah, kondisi, lokasi, deskripsi — tersimpan di database MySQL.
+![Laravel](https://img.shields.io/badge/Laravel-13-FF2D20?logo=laravel&logoColor=white)
+![Vue.js](https://img.shields.io/badge/Vue.js-3-4FC08D?logo=vuedotjs&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?logo=mysql&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
+![FrankenPHP](https://img.shields.io/badge/FrankenPHP-1.13-8A2BE2)
+
+Sistem pencatatan peralatan laboratorium berbasis web: backend **Laravel**
+yang menyediakan REST API bertoken, frontend **Vue** untuk mengelola data,
+dan seluruh layanan yang diorkestrasi dengan **Docker Compose** dalam tiga
+service. Proyek ini disusun sebagai tugas Materi Uji.
+
+## Fitur
+
+- **Autentikasi token** dengan Laravel Sanctum: hanya login yang bersifat
+  publik, seluruh endpoint lain memerlukan Bearer token.
+- **CRUD lengkap** untuk satu resource, `equipments`: tampil, tambah, ubah,
+  dan hapus peralatan laboratorium, dengan validasi pada lapisan
+  Form Request.
+- **Balasan JSON yang konsisten** (`{success, message, data}`) dengan kode
+  status yang benar: `200`, `201` untuk data baru, `401` tanpa token,
+  `404` untuk data yang tidak ditemukan, dan `422` untuk validasi gagal.
+- **Frontend Vue terintegrasi penuh**: login, daftar alat, formulir
+  tambah/ubah, hapus dengan konfirmasi, serta pesan galat `401`/`422`
+  yang tampil langsung di halaman.
+- **Satu perintah untuk menjalankan semuanya**: `docker compose up -d --build`.
+- **Data persisten** melalui named volume, dan **FrankenPHP** sebagai server
+  aplikasi backend (nilai tambahan).
+
+## Teknologi
+
+| Lapisan   | Teknologi                                              |
+|-----------|--------------------------------------------------------|
+| Backend   | Laravel 13, Laravel Sanctum, FrankenPHP 1.13.3-php8.4  |
+| Frontend  | Vue 3, Vite, axios, Nginx 1.27.4-alpine                 |
+| Basis data| MySQL 8.0.46                                           |
+| Orkestrasi| Docker Compose (3 service, 2 named volume)             |
+| Pengujian | Postman Collection, curl                               |
 
 ## Arsitektur
 
-```
-Browser (http://localhost:8080)
-   │  memanggil /api/... ke origin yang sama
-   ▼
-Frontend Vue (Nginx, service "frontend")
-   │  proxy_pass http://backend:80  (nama service Docker, BUKAN IP laptop)
-   ▼
-Backend Laravel (FrankenPHP, service "backend", port host 8000)
-   │  Sanctum (Bearer token) → Controller → Eloquent
-   ▼
-Database MySQL 8.0 (service "db", volume bernama uas_lab_db_data)
+```mermaid
+flowchart LR
+    Browser["Peramban\nlocalhost:8080"] --> Frontend["Frontend Vue\nNginx"]
+    Frontend -- "proxy /api ke\nhttp://backend:80" --> Backend["Backend Laravel\nFrankenPHP"]
+    Backend --> DB[("MySQL 8.0\nvolume: db_data")]
 ```
 
-Alur data singkat: formulir Vue → `axios` dengan header
-`Authorization: Bearer <token>` → Nginx frontend meneruskan `/api/*` ke
-service `backend` → route `api.php` (middleware `auth:sanctum`, kecuali
-login) → `EquipmentController` → validasi `FormRequest` (gagal = 422 JSON)
-→ model `Equipment` → tabel `equipment` di MySQL. Balasan selalu JSON:
-`{success, message, data}`; tambah = **201**, validasi gagal = **422**,
-tanpa token = **401**.
+| Service  | Image                          | Port host | Peran                                              |
+|----------|--------------------------------|-----------|----------------------------------------------------|
+| `db`     | `mysql:8.0.46`                 | —         | Basis data, healthcheck `mysqladmin ping`          |
+| `backend`| `dunglas/frankenphp:1.13.3-php8.4` | `8000` | REST API, autentikasi Sanctum, akses basis data    |
+| `frontend`| `nginx:1.27.4-alpine` (build `node:22.20.0-alpine`) | `8080` | Antarmuka Vue, proxy `/api` ke service `backend` |
 
-## Menjalankan (satu perintah)
+Komunikasi antarlayanan memakai **nama service Docker**, bukan alamat IP
+mesin: backend terhubung ke basis data dengan `DB_HOST=db`, dan frontend
+terhubung ke backend lewat proxy Nginx. Peramban hanya memanggil origin
+frontend sendiri. Seluruh image dasar dipin pada versi yang jelas, bukan
+`latest`.
 
-Prasyarat: Docker + Docker Compose v2 terpasang.
+Alur data: formulir Vue → axios dengan header
+`Authorization: Bearer <token>` → Nginx meneruskan `/api/*` ke service
+`backend` → route `api.php` (middleware `auth:sanctum`, kecuali login) →
+`EquipmentController` → validasi `FormRequest` → model `Equipment` →
+tabel `equipment` di MySQL.
+
+## Memulai
+
+### Prasyarat
+
+- Docker dan Docker Compose v2.
+
+### Menjalankan
 
 ```bash
 cp .env.example .env
 # Isi DB_PASSWORD dan DB_ROOT_PASSWORD di .env dengan nilai Anda sendiri.
-# APP_KEY boleh kosong: entrypoint backend membuatnya dan menyimpannya
-# di volume backend_storage.
+# APP_KEY boleh dikosongkan: entrypoint backend membuatnya dan menyimpannya
+# di volume backend_storage saat pertama kali berjalan.
 
 docker compose up -d --build
+docker compose ps
 ```
 
-Buka:
+| Akses            | URL                            |
+|------------------|--------------------------------|
+| Frontend Vue     | http://localhost:8080          |
+| API (butuh token)| http://localhost:8000/api      |
 
-- Frontend Vue: **http://localhost:8080**
-- API langsung: **http://localhost:8000/api/equipments** (butuh token)
-- Cek service: `docker compose ps`
+### Akun demo
 
-Login demo (dari seeder, hanya untuk demo lokal):
+Akun berikut dibuat otomatis oleh seeder dan hanya untuk demo lokal:
 
-- Email: `admin@lab.test`
-- Password: `password123`
+| Email          | Password    |
+|----------------|-------------|
+| admin@lab.test | password123 |
 
-> Tidak ada endpoint register publik, sesuai ketentuan soal: seluruh
-> endpoint selain login hanya bisa diakses dengan token.
+> Tidak ada endpoint registrasi publik, sesuai ketentuan soal: seluruh
+> endpoint selain login hanya dapat diakses dengan token.
 
-## Menguji dengan Postman
+### Menghentikan
 
-Impor `postman/Inventaris-Lab.postman_collection.json` ke Postman.
-Urutan: jalankan **Auth → Login** dulu — skrip Tests-nya menyimpan token
-ke variabel collection `token`, dan semua request lain memakai Bearer token
-itu. Koleksi juga berisi kasus negatif: tanpa token (401) dan validasi
-gagal (422). Variabel `base_url` default `http://localhost:8000`.
+```bash
+docker compose down      # kontainer berhenti, data tetap tersimpan
+docker compose down -v   # HATI-HATI: menghapus volume beserta datanya
+```
 
-Contoh curl (setelah login, ganti TOKEN):
+## Referensi API
+
+### Autentikasi
+
+| Metode | Endpoint       | Auth   | Keterangan                              |
+|--------|----------------|--------|-----------------------------------------|
+| POST   | `/api/login`   | —      | Mengembalikan `data.token` (Sanctum)    |
+| POST   | `/api/logout`  | Bearer | Menghapus token yang sedang dipakai     |
+| GET    | `/api/user`    | Bearer | Profil pengguna yang sedang login       |
+
+### Resource `equipments`
+
+| Metode | Endpoint                 | Auth   | Keterangan                    |
+|--------|--------------------------|--------|-------------------------------|
+| GET    | `/api/equipments`        | Bearer | Tampil semua                  |
+| POST   | `/api/equipments`        | Bearer | Tambah, balasan `201`         |
+| GET    | `/api/equipments/{id}`   | Bearer | Tampil satu, `404` bila tidak ada |
+| PUT    | `/api/equipments/{id}`   | Bearer | Ubah                          |
+| DELETE | `/api/equipments/{id}`   | Bearer | Hapus                         |
+
+### Validasi
+
+| Kolom       | Aturan                                                        |
+|-------------|---------------------------------------------------------------|
+| `name`      | Wajib                                                         |
+| `code`      | Wajib, unik                                                   |
+| `category`  | `Komputer`, `Jaringan`, `Audio Visual`, `Perkakas`, `Lainnya` |
+| `quantity`  | Integer, minimal `0`                                           |
+| `condition` | `baik`, `rusak_ringan`, `rusak_berat`, `perawatan`            |
+| `location`  | Wajib                                                         |
+| `description`| Opsional                                                     |
+
+### Contoh permintaan
 
 ```bash
 # Login
@@ -70,65 +146,67 @@ curl -s -X POST http://localhost:8000/api/login \
   -H 'Accept: application/json' -H 'Content-Type: application/json' \
   -d '{"email":"admin@lab.test","password":"password123"}'
 
-# Tampil semua (butuh token)
-curl -s http://localhost:8000/api/equipments -H "Authorization: Bearer TOKEN"
+# Tampil semua (ganti TOKEN dengan token dari login)
+curl -s http://localhost:8000/api/equipments \
+  -H "Authorization: Bearer TOKEN"
 
-# Tambah (201)
+# Tambah (balasan 201)
 curl -s -X POST http://localhost:8000/api/equipments \
   -H 'Accept: application/json' -H 'Content-Type: application/json' \
   -H "Authorization: Bearer TOKEN" \
   -d '{"name":"Laptop Praktikum","code":"LAB-101","category":"Komputer","quantity":10,"condition":"baik","location":"Lab A"}'
 
-# Tanpa token -> 401
+# Tanpa token (balasan 401)
 curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8000/api/equipments
 ```
 
-## API
+## Pengujian dengan Postman
 
-| Metode | Endpoint | Auth | Keterangan |
-|---|---|---|---|
-| POST | `/api/login` | — | Mengembalikan `data.token` (Sanctum) |
-| POST | `/api/logout` | Bearer | Menghapus token yang sedang dipakai |
-| GET | `/api/user` | Bearer | Profil user login |
-| GET | `/api/equipments` | Bearer | Tampil semua |
-| POST | `/api/equipments` | Bearer | Tambah → 201 |
-| GET | `/api/equipments/{id}` | Bearer | Tampil satu (404 bila tidak ada) |
-| PUT | `/api/equipments/{id}` | Bearer | Ubah |
-| DELETE | `/api/equipments/{id}` | Bearer | Hapus |
+Impor `postman/Inventaris-Lab.postman_collection.json` ke Postman, lalu
+jalankan **Auth → Login** terlebih dahulu: skrip Tests-nya menyimpan token
+ke variabel collection `token`, sehingga seluruh request berikutnya otomatis
+memakai Bearer token tersebut. Koleksi ini juga memuat kasus negatif: tanpa
+token (`401`) dan validasi gagal (`422`). Variabel `base_url` secara
+default mengarah ke `http://localhost:8000`.
 
-Validasi tambah/ubah: `name` wajib, `code` wajib & unik, `category` salah
-satu dari Komputer/Jaringan/Audio Visual/Perkakas/Lainnya, `quantity`
-integer ≥ 0, `condition` salah satu dari baik/rusak_ringan/rusak_berat/
-perawatan, `location` wajib, `description` opsional.
+## Konfigurasi
+
+Seluruh kredensial dibaca dari berkas `.env` di akar repository, yang
+**tidak di-commit** (lihat `.gitignore`); contoh nilainya ada di
+`.env.example`.
+
+| Variabel          | Keterangan                              |
+|-------------------|-----------------------------------------|
+| `APP_KEY`         | Boleh kosong; dibuat otomatis oleh entrypoint backend |
+| `DB_DATABASE`     | Nama basis data (`inventaris_lab`)      |
+| `DB_USERNAME`     | Pengguna basis data (`lab_user`)        |
+| `DB_PASSWORD`     | Password pengguna basis data            |
+| `DB_ROOT_PASSWORD`| Password root MySQL                     |
+
+## Keamanan
+
+- **Tidak ada** password, key, maupun token yang ditulis di dalam
+  `Dockerfile` mana pun; Dockerfile hanya membaca environment yang dikirim
+  oleh Compose.
+- Masing-masing folder `backend/` dan `frontend/` memiliki `.dockerignore`
+  sendiri, sehingga `vendor`, `node_modules`, `.env`, dan `.git` tidak
+  masuk ke konteks build.
+- Token Sanctum hanya disimpan dalam bentuk hash pada basis data.
 
 ## Persistensi data
 
-Database disimpan di **named volume** `uas_lab_db_data`. Buktinya:
+Basis data disimpan pada named volume `uas_lab_db_data`, dan storage
+backend pada `uas_lab_backend_storage`. Perintah `docker compose down`
+menghapus kontainer tetapi tidak menghapus volume, sehingga setelah
+`docker compose up -d` berikutnya, data yang dibuat sebelumnya tetap ada.
 
-```bash
-docker compose down
-docker compose up -d
-# Data yang dibuat sebelum down tetap ada — volume tidak ikut terhapus
-# (hanya `docker compose down -v` yang menghapus volume, jangan dipakai
-# bila data ingin dipertahankan).
-```
-
-## Nilai rahasia
-
-- Kredensial database dibaca dari berkas `.env` di akar repository, yang
-  **tidak di-commit** (lihat `.gitignore`). Contohnya ada di `.env.example`.
-- **Tidak ada** password/key/token yang ditulis di dalam `Dockerfile`
-  mana pun — Dockerfile hanya membaca environment yang dikirim compose.
-- Masing-masing folder `backend/` dan `frontend/` punya `.dockerignore`
-  sendiri, sehingga `node_modules`, `vendor`, `.env`, dan `.git` tidak
-  masuk ke konteks build.
-
-## Nilai tambahan: FrankenPHP
+## FrankenPHP (nilai tambahan)
 
 Backend **tidak** memakai `php artisan serve` maupun PHP-FPM + Nginx.
-Server aplikasinya adalah **FrankenPHP** (`dunglas/frankenphp:1.13.3-php8.4`,
-versi dipin, bukan `latest`) lewat `docker/Caddyfile`. Bukti bahwa API
-benar-benar dilayani FrankenPHP:
+Server aplikasinya adalah **FrankenPHP** yang dikonfigurasi lewat
+`backend/docker/Caddyfile` (root `public/`, `php_server`, header
+`X-Served-By: FrankenPHP`). Bukti bahwa API benar-benar dilayani
+FrankenPHP:
 
 ```bash
 docker compose logs backend   # baris start-up FrankenPHP/Caddy
@@ -148,22 +226,32 @@ backend/                      # Laravel + Sanctum
   app/Http/Controllers/Api/   # AuthController, EquipmentController
   app/Http/Requests/          # validasi Store/Update Equipment
   app/Models/Equipment.php
-  database/migrations/        # tabel equipment
-  database/seeders/           # admin demo + 3 alat contoh
+  database/migrations/        # tabel equipment dan personal_access_tokens
+  database/seeders/           # akun demo dan 3 alat contoh
   routes/api.php
 frontend/                     # Vue 3 + Vite
   Dockerfile                  # build Node 22.20.0-alpine, serve Nginx 1.27.4-alpine
-  nginx.conf                  # proxy /api -> http://backend:80
-  src/App.vue                 # login + daftar + form tambah/ubah/hapus
+  nginx.conf                  # proxy /api ke http://backend:80
+  src/App.vue                 # login, daftar, formulir tambah/ubah/hapus
 postman/                      # Postman Collection (siap impor)
-laporan/                      # laporan PDF
+laporan/                      # laporan PDF beserta bukti pengujian
 ```
 
 ## Pengembangan lokal tanpa Docker (opsional)
 
 ```bash
-# Backend (butuh PHP 8.3+ dan Composer, MySQL lokal, .env backend diisi)
+# Backend (membutuhkan PHP 8.3+ dan Composer; isi .env backend terlebih dahulu)
 cd backend && composer install && php artisan migrate --seed && php artisan serve --port=8000
-# Frontend
-cd frontend && npm install && npm run dev   # http://localhost:5173, /api di-proxy ke :8000
+
+# Frontend (http://localhost:5173; /api di-proxy ke :8000)
+cd frontend && npm install && npm run dev
 ```
+
+## Pemecahan masalah
+
+| Gejala | Penyelesaian |
+|--------|--------------|
+| Port `8000`/`8080` sudah dipakai | Hentikan service lain yang memakai port tersebut, atau ubah pemetaan port di `docker-compose.yml`. |
+| Backend gagal terhubung ke basis data saat start pertama | Tunggu hingga healthcheck `db` berstatus healthy; entrypoint backend mengulang koneksi selama basis data belum siap. |
+| Login gagal dengan akun demo | Pastikan seeder berjalan (`docker compose logs backend`) dan basis data tidak di-reset dengan `down -v`. |
+| Balasan `401` pada semua endpoint | Token belum dikirim atau sudah dihapus lewat logout; login ulang dan kirim header `Authorization: Bearer <token>`. |
