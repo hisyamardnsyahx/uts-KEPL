@@ -19,6 +19,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prepend(
             \App\Http\Middleware\ForceJsonResponse::class,
         );
+        // Tugas 7: hitung tiap permintaan untuk /metrics. Dipasang
+        // global supaya semua route (web dan api) tercatat, kecuali
+        // /metrics dan /health sendiri (lihat CatatMetrik).
+        $middleware->append(
+            \App\Http\Middleware\CatatMetrik::class,
+        );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

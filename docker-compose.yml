@@ -97,11 +97,125 @@ services:
     networks:
       - lab_net
 
+  # ---- Tugas 7: monitoring (Prometheus + Grafana + cAdvisor +
+  # node-exporter), dalam satu file compose yang sama dengan aplikasi.
+  # Semua versi image dikunci (bukan latest): dashboard yang tiba-tiba
+  # rusak karena Grafana naik versi sendiri adalah kejutan yang tidak
+  # menyenangkan. Port 9090 dan 3000 hanya dibuka di laptop (localhost);
+  # jangan dibuka ke internet, isinya memberi tahu orang luar banyak
+  # hal tentang sistem ini.
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: uas_lab_prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./alerts.yml:/etc/prometheus/alerts.yml:ro
+      # Volume ini wajib: tanpa prom-data, seluruh riwayat metrik
+      # hilang tiap kali container diganti, dan riwayat justru inti
+      # dari memantau.
+      - prom-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    ports:
+      - "9090:9090"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - lab_net
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: uas_lab_grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    environment:
+      # Tugas 7: password admin Grafana TIDAK BOLEH admin/admin.
+      # Nilainya dibaca dari .env (GRAFANA_PASS); contohnya ada di
+      # .env.example sebagai placeholder, bukan nilai asli. Kalau
+      # dibiarkan admin/admin, siapa pun yang bisa menjangkau port
+      # 3000 masuk sebagai admin, dan kriteria keamanan dasar (10%)
+      # gugur. Lihat Bab keamanan di laporan P11.
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASS:-ganti-password-ini-di-env}
+    volumes:
+      - grafana-data:/var/lib/grafana
+      # Provisioning: data source dan dashboard dimuat dari berkas
+      # saat Grafana menyala, jadi tidak ada langkah manual
+      # "tambahkan Prometheus dulu" dan dashboard tidak hilang
+      # bersama volume. Dashboard yang dibuat dengan klik dan hanya
+      # hidup di volume akan hilang begitu volume dihapus.
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3000:3000"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - lab_net
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: uas_lab_cadvisor
+    restart: unless-stopped
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    # Port host 8081 (bukan 8080): port 8080 di host sudah dipakai
+    # frontend. Prometheus menjangkau cAdvisor lewat jaringan Compose
+    # (cadvisor:8080), jadi port host-nya tidak memengaruhi scrape.
+    ports:
+      - "8081:8080"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - lab_net
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.1
+    container_name: uas_lab_node_exporter
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    ports:
+      - "9100:9100"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - lab_net
+
 volumes:
   db_data:
     name: uas_lab_db_data
   backend_storage:
     name: uas_lab_backend_storage
+  # Tugas 7: volume data monitoring. Tanpa keduanya, riwayat
+  # Prometheus dan susunan Grafana hilang tiap kali container diganti.
+  prom-data:
+    name: uas_lab_prom_data
+  grafana-data:
+    name: uas_lab_grafana_data
 
 networks:
   lab_net:

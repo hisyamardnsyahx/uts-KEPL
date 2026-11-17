@@ -158,6 +158,58 @@ Perintah manual yang setara ada di skrip itu; salin output terminal
 dan screenshot `docker compose ps` saat sehat dan sakit untuk
 laporan `P10_NIM_Nama.pdf`.
 
+## Tugas 7 — Monitoring Prometheus + Grafana
+
+Perubahan untuk Tugas 7 (Konstruksi & Evolusi PL, Pertemuan 11):
+
+- **Empat layanan pemantau** di `docker-compose.yml` yang sama dengan
+  aplikasi, semua versi dikunci: Prometheus `prom/prometheus:v2.53.0`,
+  Grafana `grafana/grafana:11.1.0`, cAdvisor
+  `gcr.io/cadvisor/cadvisor:v0.49.1`, node-exporter
+  `prom/node-exporter:v1.8.1`. Volume `prom-data` dan `grafana-data`
+  menjaga riwayat dan susunan dashboard tetap ada.
+- **`/metrics` di Laravel** (`MetricsController`, middleware
+  `CatatMetrik`): counter `http_requests_total{method,status,route}`
+  dalam format eksposisi Prometheus, ditulis sendiri tanpa dependensi
+  eksternal. Labelnya hanya method, status, dan pola route, supaya
+  jumlah deret waktu tidak meledak. Permintaan ke `/metrics` dan
+  `/health` tidak dihitung, supaya panel permintaan/detik mengukur
+  lalu lintas pengguna, bukan lalu lintas pemantau.
+- **`prometheus.yml`**: scrape tiap 15 detik, target `prometheus`
+  (localhost:9090), `container` (cadvisor:8080), `server`
+  (node-exporter:9100), dan `aplikasi` (backend:80/metrics).
+- **`alerts.yml`**: `LayananMati` (`up{job="aplikasi"} == 0`,
+  `for: 2m`, severity kritis, action "Cek docker compose ps lalu
+  docker compose logs backend") dan `ErrorTinggi` (rasio error 5xx
+  > 5% selama 5 menit, severity peringatan).
+- **Dashboard Grafana** (`grafana/provisioning/dashboards/inventaris-lab.json`,
+  dimuat otomatis lewat provisioning, beserta data source Prometheus):
+  5 panel, semuanya berjudul pertanyaan — "Apakah semua layanan
+  masih hidup?" (Stat, `sum(up)`), "Berapa banyak CPU yang dipakai
+  tiap container?", "Berapa memori yang dipakai tiap container?",
+  "Berapa permintaan per detik yang dilayani aplikasi?", dan
+  "Berapa persen permintaan yang gagal?" — masing-masing dengan satuan
+  pada sumbunya.
+- **Keamanan**: password admin Grafana dibaca dari `.env`
+  (`GRAFANA_PASS`), contohnya di `.env.example` sebagai placeholder,
+  bukan nilai asli. Jangan biarkan `admin/admin`: siapa pun yang bisa
+  menjangkau port 3000 akan masuk sebagai admin.
+
+### Menguji Tugas 7 di laptop
+
+```bash
+./tugas7-uji.sh
+# up --build, buat lalu lintas, cek /targets (semua UP),
+# buka dashboard di http://localhost:3000, stop backend,
+# tunggu 3 menit sampai LayananMati FIRING, screenshot Alerts,
+# lalu start backend lagi sampai pulih.
+```
+
+Port: Prometheus http://localhost:9090, Grafana
+http://localhost:3000, cAdvisor http://localhost:8081 (port
+host 8081, karena 8080 sudah dipakai frontend; Prometheus tetap
+menjangkaunya sebagai cadvisor:8080).
+
 ## Referensi API
 
 ### Autentikasi

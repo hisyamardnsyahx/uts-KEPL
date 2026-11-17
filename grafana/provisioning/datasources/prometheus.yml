@@ -1,0 +1,11 @@
+# Tugas 7: data source Prometheus dimuat otomatis saat Grafana menyala.
+# Tidak ada lagi langkah manual "tambahkan Prometheus dulu".
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    uid: prometheus
+    editable: true

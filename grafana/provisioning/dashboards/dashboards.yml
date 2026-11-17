@@ -1,0 +1,13 @@
+# Tugas 7: dashboard dimuat dari berkas saat Grafana menyala, supaya
+# dashboard ikut masuk git dan muncul lagi dengan docker compose up saja.
+apiVersion: 1
+providers:
+  - name: 'default'
+    orgId: 1
+    folder: ''
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards

@@ -1,0 +1,36 @@
+# Tugas 7: aturan alarm Prometheus untuk Inventaris Lab.
+# Aturan ditulis di sini (bukan di Grafana) supaya ikut masuk git
+# dan bisa di-review seperti kode, sesuai modul Pertemuan 11.
+# for: menahan alarm sebentar supaya satu kedipan jaringan tidak
+# langsung membangunkan orang. annotations menyebutkan tindakan
+# pertama yang harus dilakukan penerima, bukan sekadar "ada masalah".
+groups:
+  - name: aplikasi
+    rules:
+      # Alarm utama yang dibuktikan pada tugas ini: matikan satu
+      # layanan, dan alarm ini harus berubah menjadi FIRING.
+      # up{job="aplikasi"} == 0 berarti Prometheus tidak bisa lagi
+      # menarik /metrics dari backend.
+      - alert: LayananMati
+        expr: up{job="aplikasi"} == 0
+        for: 2m
+        labels:
+          severity: kritis
+        annotations:
+          summary: "Aplikasi tidak bisa ditarik"
+          action: "Cek docker compose ps lalu docker compose logs backend"
+
+      # Alarm kedua: lebih dari 5% permintaan gagal selama 5 menit.
+      # Rasio, bukan jumlah, supaya alarm ini tetap bermakna baik
+      # saat lalu lintas sepi maupun ramai. http_requests_total
+      # adalah counter, jadi dibungkus rate(...[5m]).
+      - alert: ErrorTinggi
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m]))
+          / sum(rate(http_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: peringatan
+        annotations:
+          summary: "Lebih dari 5% permintaan gagal"
+          action: "Lihat log backend, bandingkan dengan waktu deploy terakhir"

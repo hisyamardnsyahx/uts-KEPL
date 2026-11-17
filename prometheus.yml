@@ -1,0 +1,41 @@
+# Tugas 7: konfigurasi Prometheus untuk Inventaris Lab.
+# Nama host memakai nama layanan Compose, bukan IP dan bukan
+# localhost: di dalam jaringan Compose, nama layanan ADALAH nama host.
+# scrape_interval 15 detik adalah titik tengah yang sehat menurut
+# modul Pertemuan 11: lebih rapat memberi grafik lebih halus tapi
+# memakan lebih banyak ruang, lebih jarang membuat lonjakan pendek
+# luput terekam.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+# Aturan alarm dibaca dari alerts.yml (lihat berkas itu).
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+scrape_configs:
+  # Prometheus sendiri. Target ini harus UP dulu sebelum yang lain
+  # diperiksa: kalau Prometheus sendiri tidak bisa ditarik, masalahnya
+  # ada di Prometheus, bukan di aplikasi.
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Metrik tiap container (CPU, memori) dari cAdvisor.
+  - job_name: 'container'
+    static_configs:
+      - targets: ['cadvisor:8080']
+
+  # Metrik mesin (CPU, memori, disk host) dari node-exporter.
+  - job_name: 'server'
+    static_configs:
+      - targets: ['node-exporter:9100']
+
+  # Aplikasi Inventaris Lab sendiri. Layanan backend mendengarkan
+  # port 80 di dalam container (bukan 8000; 8000 adalah port host).
+  # Endpoint /metrics-nya ditulis sendiri di Laravel (lihat
+  # MetricsController), tanpa dependensi eksternal.
+  - job_name: 'aplikasi'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['backend:80']
