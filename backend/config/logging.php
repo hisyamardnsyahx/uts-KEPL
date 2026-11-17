@@ -1,5 +1,6 @@
 <?php
 
+use Monolog\Formatter\JsonFormatter;
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
@@ -18,7 +19,14 @@ return [
     |
     */
 
-    'default' => env('LOG_CHANNEL', 'stack'),
+    // Tugas 6: log keluar ke stdout (bukan ke berkas di dalam container),
+    // supaya terbaca lewat `docker compose logs backend`. Formatnya JSON
+    // satu baris per kejadian, jadi tiap log sudah terstruktur dan mudah
+    // disaring. Channel ini yang dipakai sebagai default; nilai lama
+    // ('stack' -> 'single', berkas storage/logs/laravel.log) sengaja
+    // ditinggalkan untuk tugas ini, karena berkas itu tidak keluar dari
+    // container dan tidak terlihat di `docker compose logs`.
+    'default' => env('LOG_CHANNEL', 'stdout'),
 
     /*
     |--------------------------------------------------------------------------
@@ -51,6 +59,23 @@ return [
     */
 
     'channels' => [
+
+        // Tugas 6: stdout, JSON satu baris per log. `php://stdout` di
+        // dalam container FrankenPHP diteruskan Docker ke `docker compose
+        // logs`, jadi tidak perlu lagi masuk ke container untuk membaca
+        // berkas log. Tidak ada password, token, atau data pribadi yang
+        // ditulis ke channel ini; konteks log hanya berisi id, aksi,
+        // dan sebab yang sudah disaring di tiap pemanggil Log::.
+        'stdout' => [
+            'driver' => 'monolog',
+            'level' => env('LOG_LEVEL', 'debug'),
+            'handler' => StreamHandler::class,
+            'formatter' => JsonFormatter::class,
+            'handler_with' => [
+                'stream' => 'php://stdout',
+            ],
+            'processors' => [PsrLogMessageProcessor::class],
+        ],
 
         'stack' => [
             'driver' => 'stack',

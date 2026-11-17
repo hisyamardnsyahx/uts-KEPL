@@ -15,6 +15,15 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+      start_period: 10s
+    # Tugas 6: batasi ukuran log container (json-file). Tanpa batas,
+    # satu container yang menulis log terus-menerus bisa menghabiskan
+    # disk laptop. 10 MB per berkas, 3 berkas = maksimal ~30 MB.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - lab_net
 
@@ -33,6 +42,10 @@ services:
       APP_DEBUG: "false"
       APP_URL: http://localhost:8000
       APP_KEY: ${APP_KEY:-}
+      # Tugas 6: log Laravel keluar ke stdout (channel 'stdout',
+      # JSON satu baris), bukan ke berkas di dalam container.
+      LOG_CHANNEL: stdout
+      LOG_LEVEL: debug
       DB_CONNECTION: mysql
       DB_HOST: db
       DB_PORT: 3306
@@ -46,6 +59,22 @@ services:
       - "8000:80"
     volumes:
       - backend_storage:/app/storage
+    # Tugas 6: healthcheck backend. Yang diperiksa bukan "container
+    # menyala", melainkan /health yang memeriksa basis data + cache
+    # (200 = healthy, 503 = unhealthy). start_period 40 detik memberi
+    # waktu entrypoint menyelesaikan migrate + seed pertama kali;
+    # interval 10 detik, timeout 5 detik, retries 5.
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - lab_net
 
@@ -59,6 +88,12 @@ services:
       - backend
     ports:
       - "8080:80"
+    # Tugas 6: batas ukuran log, sama seperti layanan lain.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - lab_net
 

@@ -9,6 +9,12 @@ WORKDIR /app
 # Ekstensi yang dibutuhkan Laravel + driver MySQL.
 RUN install-php-extensions pdo_mysql zip intl opcache
 
+# Tugas 6: curl dipakai healthcheck backend (curl -f
+# http://localhost/health). Base image FrankenPHP tidak
+# membawanya secara bawaan, jadi dipasang eksplisit di sini.
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
 # Composer hanya untuk tahap build di dalam image ini.
 COPY --from=composer:2.8.10 /usr/bin/composer /usr/bin/composer
 

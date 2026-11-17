@@ -106,6 +106,58 @@ docker compose down      # kontainer berhenti, data tetap tersimpan
 docker compose down -v   # HATI-HATI: menghapus volume beserta datanya
 ```
 
+## Tugas 6 — Log, /health, dan healthcheck
+
+Perubahan untuk Tugas 6 (Konstruksi & Evolusi PL, Pertemuan 10):
+
+- **Log ke stdout, format JSON.** Channel default Laravel diubah dari
+  `stack` (berkas `storage/logs/laravel.log` di dalam container) ke
+  channel `stdout` di `backend/config/logging.php` (Monolog
+  `StreamHandler` ke `php://stdout`, `JsonFormatter`). Buktinya:
+  `docker compose logs backend` menampilkan tiap log sebagai satu
+  baris JSON. `LOG_CHANNEL=stdout` juga dipasang di `docker-compose.yml`.
+- **Tiga alur yang diberi log terstruktur**, masing-masing dengan
+  konteks siapa, sedang apa, dan sebabnya — tanpa password, token,
+  atau data pribadi:
+  1. **Menyimpan data** (`equipment.created`, level `info`) di
+     `EquipmentController::store` — dipilih karena ini alur tulis
+     utama; kalau gagal diam-diam, pengguna mengira alatnya tercatat.
+  2. **Validasi gagal** (`equipment.validation_failed`, level
+     `warning`) di `StoreEquipmentRequest` dan
+     `UpdateEquipmentRequest` — dicatat hanya nama kolom yang gagal,
+     bukan nilai yang dikirim.
+  3. **Gagal menghubungi basis data** (`equipment.database_error`,
+     level `error`) di `EquipmentController` saat `QueryException`,
+     dan `health.database_error` / `health.cache_error` di
+     `HealthController` — dicatat hanya kode galatnya.
+- **Endpoint `GET /health`** (`backend/routes/web.php`,
+  `HealthController`, publik tanpa token): memeriksa basis data
+  dengan `SELECT 1` dan cache dengan tulis-baca kunci uji. Balasan
+  `200` kalau sehat, `503` kalau tidak, dengan daftar bagian yang
+  gagal (`failed: ["database"]`).
+- **Healthcheck backend** di `docker-compose.yml`: `curl -f
+  http://localhost/health`, interval 10 detik, timeout 5 detik,
+  retries 5, `start_period` 40 detik (memberi waktu migrate + seed
+  pertama). `curl` dipasang eksplisit di `backend/Dockerfile`
+  karena base image FrankenPHP tidak membawanya.
+- **Batas ukuran log** di semua service (`db`, `backend`,
+  `frontend`): driver `json-file`, `max-size: "10m"`,
+  `max-file: "3"` (±30 MB per container).
+
+### Menguji Tugas 6 di laptop
+
+```bash
+./tugas6-uji.sh
+# Skrip ini menjalankan urutan lengkap: up --build, ps saat sehat,
+# /health (200), simpan alat, kirim data tidak valid (422),
+# docker compose logs backend, stop db, ps saat sakit,
+# /health (503), logs saat sakit, start db lagi, ps + /health pulih.
+```
+
+Perintah manual yang setara ada di skrip itu; salin output terminal
+dan screenshot `docker compose ps` saat sehat dan sakit untuk
+laporan `P10_NIM_Nama.pdf`.
+
 ## Referensi API
 
 ### Autentikasi
